@@ -1,6 +1,8 @@
 package com.pajk.rdb;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class ZipList {
 	public static final int ZIPLIST_PREV_ENTRY_LENGTH = 254;
@@ -21,6 +23,10 @@ public class ZipList {
 	public ZipList(byte[] ziplistByte) {
 		super();
 		this.ziplistByte = ziplistByte;
+		/*
+		 * 从第9个字节开始，跳过前面8个字节，其中前4个字节表示ziplist的长度，
+		 * 后4个字节表示最后一个entry在ziplist中的相对偏移量
+		 */
 		this.index = 8;
 	}
 
@@ -59,7 +65,10 @@ public class ZipList {
 		/*
 		 * 占2个字节,entry的个数,key和value都是一个entry,所以解析Map的for循环次数要除以2
 		 */
-		int entryCount = (((ziplistByte[index + 1] & 0x003F) << 8) | (ziplistByte[index] & 0x00ff));
+		byte[] countbyte = new byte[] { ziplistByte[index],
+				ziplistByte[index + 1] };
+		ByteBuffer.wrap(countbyte).order(ByteOrder.LITTLE_ENDIAN);
+		int entryCount = (((countbyte[1] & 0x003F) << 8) | (countbyte[0] & 0x00ff));
 		// 解析了2个字节，下标移动2个位置
 		index = index + 2;
 		return entryCount;

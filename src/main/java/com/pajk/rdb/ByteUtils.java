@@ -80,4 +80,15 @@ public class ByteUtils {
 		}
 	}
 
+	public static byte[] readByte(byte[] oldByte, int num) {
+		byte[] buff = new byte[num];
+		byte[] tempbuff = new byte[oldByte.length - num];
+		for (int i = 0; i < num; i++) {
+			buff[i] = oldByte[i];
+		}
+		System.arraycopy(oldByte, num, tempbuff, 0, tempbuff.length);
+		oldByte = tempbuff;
+		return buff;
+	}
+
 }

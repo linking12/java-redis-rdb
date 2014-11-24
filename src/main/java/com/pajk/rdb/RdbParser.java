@@ -174,41 +174,49 @@ public class RdbParser {
 			if (type == REDIS_HASH_ZIPMAP) {
 				value = ZipMap.zipmapExpand(strByte);
 			} else if (type == REDIS_LIST_ZIPLIST) {
+
 				List<String> lists = new ArrayList<String>();
 				ZipList zipList = new ZipList(strByte);
 				int entryCountList = zipList.decodeEntryCount();
-				for (int j = 0; j < entryCountList; j++) {
-					if (zipList.getEndByte() == ZipList.ZIPLIST_END)
-						break;
-					lists.add(zipList.decodeEntryValue());
-				}
-				value = lists;
+				System.out.println("~" + entryCountList);
+				// for (int j = 0; j < entryCountList; j++) {
+				// if (zipList.getEndByte() == ZipList.ZIPLIST_END)
+				// break;
+				// lists.add(zipList.decodeEntryValue());
+				// }
+				// value = lists;
 			} else if (type == REDIS_SET_INTSET) {
 				IntSet intset = new IntSet(strByte);
 				value = intset.docodeIntsetValue();
 			} else if (type == REDIS_ZSET_ZIPLIST) {
-				List<String> lists = new ArrayList<String>();
+
+				TreeMap<String, String> zsetValues1 = new TreeMap<String, String>();
 				ZipList zipList = new ZipList(strByte);
 				int entryCountList = zipList.decodeEntryCount();
-				for (int j = 0; j < entryCountList; j++) {
-					if (zipList.getEndByte() == ZipList.ZIPLIST_END)
-						break;
-					lists.add(zipList.decodeEntryValue());
-				}
-				value = lists;
+				System.out.println("~" + entryCountList);
+				// for (int j = 0; j < entryCountList / 2; j++) {
+				// if (zipList.getEndByte() == ZipList.ZIPLIST_END)
+				// break;
+				// String val = zipList.decodeEntryValue();
+				// String score = zipList.decodeEntryValue();
+				// zsetValues1.put(val, score);
+				// }
+				// value = zsetValues1;
 			} else if (type == REDIS_HASH_ZIPLIST) {
+
 				HashMap<String, String> hashmapValues = new HashMap<String, String>();
 				ZipList zipLit = new ZipList(strByte);
-				int entryCounttt = zipLit.decodeEntryCount();
-				for (int j = 0; j < entryCounttt / 2; j++) {
-					if (zipLit.getEndByte() == ZipList.ZIPLIST_END) {
-						break;
-					}
-					String hashKey = zipLit.decodeEntryValue();
-					String hashValue = zipLit.decodeEntryValue();
-					hashmapValues.put(hashKey, hashValue);
-				}
-				value = hashmapValues;
+				int entryCountList = zipLit.decodeEntryCount();
+				System.out.println("~" + entryCountList);
+				// for (int j = 0; j < entryCounttt / 2; j++) {
+				// if (zipLit.getEndByte() == ZipList.ZIPLIST_END) {
+				// break;
+				// }
+				// String hashKey = zipLit.decodeEntryValue();
+				// String hashValue = zipLit.decodeEntryValue();
+				// hashmapValues.put(hashKey, hashValue);
+				// }
+				// value = hashmapValues;
 			}
 			break;
 		}
@@ -216,5 +224,4 @@ public class RdbParser {
 		return value;
 
 	}
-
 }
