@@ -6,7 +6,6 @@ import java.nio.ByteOrder;
 
 public class ZipList {
 	public static final int ZIPLIST_PREV_ENTRY_LENGTH = 254;
-	public static final int ZIPLIST_END = 255; // zip list结束符
 
 	public static final int ZIPLIST_ENTRY_FLAG_6BITLEN = 0; // 6位用于计数
 	public static final int ZIPLIST_ENTRY_FLAG_14BITLEN = 1;
@@ -17,182 +16,141 @@ public class ZipList {
 	public static final int ZIPLIST_ENTRY_FLAG_N3BYTEVLAUE = 0x00f0;
 	public static final int ZIPLIST_ENTRY_FLAG_N1BYTEVLAUE = 0x00fe;
 
-	private final byte[] ziplistByte; // zip list数据
-	private int index; // byte数组下标
+	private byte[] ziplistByte; // zip list数据
 
 	public ZipList(byte[] ziplistByte) {
 		super();
 		this.ziplistByte = ziplistByte;
-		/*
-		 * 从第9个字节开始，跳过前面8个字节，其中前4个字节表示ziplist的长度，
-		 * 后4个字节表示最后一个entry在ziplist中的相对偏移量
-		 */
-		this.index = 8;
-	}
-
-	public int getEndByte() {
-		return ziplistByte[index];
-	}
-
-	/*
-	 * 占1或5个字节,表示前一个entry的字节长度，第一个entry是0
-	 * 如果第一个字节整型值等于254,则后面的4个字节表示长度,否则第一个字节整型值就是长度
-	 */
-	private void decodePrevEntryFlag() {
-		int len = prevEntryIntegerValue();
-		if (len < ZIPLIST_PREV_ENTRY_LENGTH) {
-			index++;
-		} else {
-			index = index + 5;
-		}
-	}
-
-	/*
-	 * 前一个entry占用的字节数
-	 */
-	private int prevEntryIntegerValue() {
-		int len = ziplistByte[index];
-		if (len < ZIPLIST_PREV_ENTRY_LENGTH)
-			return len;
-		len = ((ziplistByte[index + 4] & 0x00ff) << 24)
-				+ ((ziplistByte[index + 3] & 0x00ff) << 16)
-				+ ((ziplistByte[index + 2] & 0x00ff) << 8)
-				+ ((ziplistByte[index + 1] & 0x00ff));
-		return len;
 	}
 
 	public int decodeEntryCount() {
-		/*
-		 * 占2个字节,entry的个数,key和value都是一个entry,所以解析Map的for循环次数要除以2
-		 */
-		byte[] countbyte = new byte[] { ziplistByte[index],
-				ziplistByte[index + 1] };
-		ByteBuffer.wrap(countbyte).order(ByteOrder.LITTLE_ENDIAN);
-		int entryCount = (((countbyte[1] & 0x003F) << 8) | (countbyte[0] & 0x00ff));
-		// 解析了2个字节，下标移动2个位置
-		index = index + 2;
+		@SuppressWarnings("unused")
+		byte[] zlbytes = readByte(4);
+		@SuppressWarnings("unused")
+		byte[] tail_offset = readByte(4);
+		byte[] num_entries = readByte(2);
+		ByteBuffer.wrap(num_entries).order(ByteOrder.LITTLE_ENDIAN);
+		int entryCount = bytesToInt(num_entries);
 		return entryCount;
 	}
 
-	/**
-	 * entry的value
-	 * 
-	 * @return
-	 */
-	public String decodeEntryValue() {
-		decodePrevEntryFlag();
-
-		Integer[] object = decodeEntrySpecialFlag();
-		int entryDataByteLen = object[0]; // entry数据的字节长度
-
-		String value;
-		if (object[1] != null) {
-			value = String.valueOf(object[1]);
-		} else {
-			value = byteToString(subbyte(ziplistByte, index, entryDataByteLen));
-		}
-		index = index + entryDataByteLen;
-		return value;
+	public int getEndByte() {
+		byte[] zlbytes = readByte(1);
+		return zlbytes[0] & 0xFF;
 	}
 
-	/**
-	 * special flag,占用字节数1到9之间, 用于表示entry数据占的字节长度或entry的整型值
-	 * 
-	 * @param value
-	 * @param index
-	 * @return Integer[] [entry data bytes length , entry integer value]
-	 */
-	private Integer[] decodeEntrySpecialFlag() {
-		byte[] buf = new byte[9];
-		int flagLen = 1;
-		int entryLen = 0;
-		Integer intValue = null;
-
-		for (int i = 0; i < buf.length && ((index + i) < ziplistByte.length); i++) {
-			buf[i] = ziplistByte[index + i];
+	public Object decodeEntryValue() {
+		int length;
+		Object value = null;
+		byte[] prev_lengthbyte = readByte(1);
+		int pre_length = prev_lengthbyte[0] & 0xFF;
+		if (pre_length == ZIPLIST_PREV_ENTRY_LENGTH) {
+			prev_lengthbyte = readByte(4);
+			pre_length = bytesToInt(prev_lengthbyte);
 		}
-		int type = (buf[0] & 0x00C0) >> 6;
-		if (buf[0] == ZIPLIST_ENTRY_FLAG_N1BYTEVLAUE) {
-			/* Read next 1 byte integer value */
-			flagLen = 1;
-			entryLen = 1;
-			intValue = (0x00ff & buf[1]);
-		} else if (buf[0] == ZIPLIST_ENTRY_FLAG_N3BYTEVLAUE) {
-			/* Read next 3 byte integer value */
-			flagLen = 1;
-			entryLen = 3;
-			intValue = ((buf[3] & 0x00ff) << 16) + ((buf[2] & 0x00ff) << 8)
-					+ ((buf[1] & 0x00ff));
-		} else if (type == ZIPLIST_ENTRY_FLAG_6BITLEN) {
-			/* Read a 6 bit len */
-			flagLen = 1;
-			entryLen = (buf[0] & 0x003F);
-		} else if (type == ZIPLIST_ENTRY_FLAG_14BITLEN) {
-			/* Read a 14 bit len */
-			flagLen = 2;
-			entryLen = ((buf[0] & 0x003F) << 8) | (buf[1] & 0x00ff);
-		} else if (type == ZIPLIST_ENTRY_FLAG_5BYTELEN) {
-			/* Read a 5 byte len */
-			flagLen = 5;
-			entryLen = ((buf[4] & 0x00ff) << 32) + ((buf[3] & 0x00ff) << 24)
-					+ ((buf[2] & 0x00ff) << 16) + ((buf[1] & 0x00ff) << 8)
-					+ ((buf[0] & 0x003F));
-		} else {
-			type = (buf[0] & 0x00f0) >> 4;
-			if (type == ZIPLIST_ENTRY_FLAG_N2BYTEVLAUE) {
-				/* Read next 2 byte integer value */
-				flagLen = 1;
-				entryLen = 2;
-				intValue = ((buf[2] & 0x00ff) << 8) + ((buf[1] & 0x00ff));
-			} else if (type == ZIPLIST_ENTRY_FLAG_N4BYTEVLAUE) {
-				/* Read next 4 byte integer value */
-				flagLen = 1;
-				entryLen = 4;
-				intValue = ((buf[4] & 0x00ff) << 24)
-						+ ((buf[3] & 0x00ff) << 16) + ((buf[2] & 0x00ff) << 8)
-						+ ((buf[1] & 0x00ff));
-			} else if (type == ZIPLIST_ENTRY_FLAG_N8BYTEVLAUE) {
-				/* Read next 8 byte integer value */
-				flagLen = 1;
-				entryLen = 8;
-				intValue = ((buf[8] & 0x00ff) << 56)
-						+ ((buf[7] & 0x00ff) << 48) + ((buf[6] & 0x00ff) << 40)
-						+ ((buf[5] & 0x00ff) << 32) + ((buf[4] & 0x00ff) << 24)
-						+ ((buf[3] & 0x00ff) << 16) + ((buf[2] & 0x00ff) << 8)
-						+ ((buf[1] & 0x00ff));
-			} else if (type == 15) {
-				/* Read next 8 byte integer value */
-				flagLen = 1;
-				entryLen = (buf[0] & 0x000f);
-			} else {
-				ERROR(" Unknown entry special flag encoding (0x%02x) ", type);
+		byte[] entry_headerbuff = readByte(1);
+		if ((entry_headerbuff[0] & 0x00C0) >> 6 == ZIPLIST_ENTRY_FLAG_6BITLEN) {
+			length = entry_headerbuff[0] & 0x003F;
+			byte[] buff = readByte(length);
+			try {
+				value = new String(buff, "ASCII");
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
 			}
-		}
-		if (entryLen == 0) {
-			ERROR(" entryLen is not 0 (0x%02x) ", entryLen);
-		}
-		// 解析完special flag后, index往下移
-		index = index + flagLen;
-		return new Integer[] { entryLen, intValue };
-	}
-
-	static byte[] subbyte(byte[] buf, int start, int len) {
-		byte[] value = new byte[len];
-		for (int i = 0; i < len; start++, i++) {
-			value[i] = buf[start];
+		} else if ((entry_headerbuff[0] & 0x00C0) >> 6 == ZIPLIST_ENTRY_FLAG_14BITLEN) {
+			length = ((entry_headerbuff[0] & 0x003F) << 8)
+					| (entry_headerbuff[1] & 0x00ff);
+			byte[] buff = readByte(length);
+			try {
+				value = new String(buff, "ASCII");
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
+		} else if ((entry_headerbuff[0] & 0x00C0) >> 6 == ZIPLIST_ENTRY_FLAG_5BYTELEN) {
+			byte[] lengthbuff = readByte(4);
+			ByteBuffer.wrap(lengthbuff).order(ByteOrder.BIG_ENDIAN);
+			length = bytesToInt(lengthbuff);
+			byte[] buff = readByte(length);
+			try {
+				value = new String(buff, "ASCII");
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
+		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N2BYTEVLAUE) {
+			length = 2;
+			byte[] buff = readByte(length);// short
+			value = bytesToShort(buff);
+		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N4BYTEVLAUE) {
+			length = 4;
+			byte[] buff = readByte(length);// int
+			value = bytesToInt(buff);
+		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N8BYTEVLAUE) {
+			length = 8;
+			byte[] buff = readByte(length);// long
+			value = bytesToLong(buff);
+		} else if ((entry_headerbuff[0] & 0x00f0) == 240) {
+			byte[] buff = readByte(3);
+			byte[] newbuff = new byte[4];
+			newbuff[0] = 0;
+			System.arraycopy(buff, 0, newbuff, 1, buff.length);
+			value = bytesToInt(newbuff) >> 8;
+		} else if ((entry_headerbuff[0] & 0x00f0) == 254) {
+			byte[] buff = readByte(1);
+			value = (0x00ff & buff[0]);
+		} else if ((entry_headerbuff[0] & 0x00f0) >= 254
+				&& (entry_headerbuff[0] & 0x00f0) <= 253) {
+			value = (entry_headerbuff[0] & 0x00f0) - 241;
 		}
 		return value;
+
 	}
 
-	static String byteToString(byte[] buf) {
-		try {
-			return new String(buf, "ASCII");
-		} catch (UnsupportedEncodingException e) {
-			return new String(buf);
+	private int bytesToInt(byte[] buff) {
+		if (buff.length == 2)
+			return ((buff[1] & 0x003F) << 8) | (buff[0] & 0x00ff);
+		else if (buff.length == 4)
+			return buff[3] & 0xFF | (buff[2] & 0xFF) << 8
+					| (buff[1] & 0xFF) << 16 | (buff[0] & 0xFF) << 24;
+		else
+			return 0;
+	}
+
+	private short bytesToShort(byte[] buff) {
+		return (short) (((buff[1] << 8) | buff[0] & 0xff));
+	}
+
+	private long bytesToLong(byte[] buff) {
+		return ((buff[8] & 0x00ff) << 56) + ((buff[7] & 0x00ff) << 48)
+				+ ((buff[6] & 0x00ff) << 40) + ((buff[5] & 0x00ff) << 32)
+				+ ((buff[4] & 0x00ff) << 24) + ((buff[3] & 0x00ff) << 16)
+				+ ((buff[2] & 0x00ff) << 8) + ((buff[1] & 0x00ff));
+	}
+
+	public byte[] readByte(int num) {
+		byte[] buff = new byte[num];
+		byte[] tempbuff = new byte[ziplistByte.length - num];
+		for (int i = 0; i < num; i++) {
+			buff[i] = ziplistByte[i];
 		}
+		System.arraycopy(ziplistByte, num, tempbuff, 0, tempbuff.length);
+		ziplistByte = tempbuff;
+		return buff;
 	}
 
-	static void ERROR(String msg, Object... args) {
-		throw new RuntimeException(String.format(msg, args));
+	public static void main(String[] args) {
+		int t = (3 << 8);
+		byte[] result = new byte[4];
+		result[0] = (byte) (t >>> 24);// 取最高8位放到0下标
+		result[1] = (byte) (t >>> 16);// 取次高8为放到1下标
+		result[2] = (byte) (t >>> 8); // 取次低8位放到2下标
+		result[3] = (byte) (t); // 取最低8位放到3下标
+		System.out.println(result);
+	}
+
+	public static void putInt(byte[] bb, int x, int index) {
+		bb[index + 3] = (byte) (x >> 24);
+		bb[index + 2] = (byte) (x >> 16);
+		bb[index + 1] = (byte) (x >> 8);
+		bb[index + 0] = (byte) (x >> 0);
 	}
 }
