@@ -2,7 +2,7 @@
 ##parse redis dump.rdb file
 
 ###High Level Algorithm to parse RDB
-###ºÊ»›redis 2.4/2.8/3.0
+###compatible redis 2.4/2.8/3.0
 
 ```
 public class RedisRdbParseTest {
