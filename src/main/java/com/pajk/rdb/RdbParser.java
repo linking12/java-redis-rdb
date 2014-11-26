@@ -63,9 +63,9 @@ public class RdbParser {
 	}
 
 	private void rdbParseBody(RandomAccessFile position, CallBackHandler handler) {
-		int type, valType;
+		int type;
 		long expiretime = 0, dbid = -1;
-		String key;
+		String key, valType;
 		Object value;
 		while (true) {
 			type = rdbLoadType(position);
@@ -91,21 +91,19 @@ public class RdbParser {
 			key = (String) rdbLoadStringObject(position, true);
 			if (key == null)
 				ERROR("Could not read key");
-
 			if (type == REDIS_HASH_ZIPMAP || type == REDIS_HASH_ZIPLIST) {
-				valType = REDIS_HASH;
+				valType = "HASH";
 			} else if (type == REDIS_LIST_ZIPLIST) {
-				valType = REDIS_LIST;
+				valType = "LIST";
 			} else if (type == REDIS_SET_INTSET) {
-				valType = REDIS_SET;
+				valType = "SET";
 			} else if (type == REDIS_ZSET_ZIPLIST) {
-				valType = REDIS_ZSET;
+				valType = "ZSET";
 			} else {
-				valType = type;
+				valType = "STRING";
 			}
-			Integer rlen = 0;
 			value = rdbLoadValueObject(position, type);
-			handler.printlnHandler(dbid, valType, key, value, rlen, expiretime);
+			handler.printlnHandler(dbid, valType, key, value, expiretime);
 		}
 	}
 

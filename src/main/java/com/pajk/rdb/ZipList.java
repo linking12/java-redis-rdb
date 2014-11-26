@@ -59,7 +59,7 @@ public class ZipList {
 			}
 		} else if ((entry_headerbuff[0] & 0x00C0) >> 6 == ZIPLIST_ENTRY_FLAG_14BITLEN) {
 			length = ((entry_headerbuff[0] & 0x003F) << 8)
-					| (entry_headerbuff[1] & 0x00ff);
+					| (readByte(1)[0] & 0x00ff);
 			byte[] buff = readByte(length);
 			try {
 				value = new String(buff, "ASCII");
@@ -120,10 +120,10 @@ public class ZipList {
 	}
 
 	private long bytesToLong(byte[] buff) {
-		return ((buff[8] & 0x00ff) << 56) + ((buff[7] & 0x00ff) << 48)
-				+ ((buff[6] & 0x00ff) << 40) + ((buff[5] & 0x00ff) << 32)
-				+ ((buff[4] & 0x00ff) << 24) + ((buff[3] & 0x00ff) << 16)
-				+ ((buff[2] & 0x00ff) << 8) + ((buff[1] & 0x00ff));
+		return ((buff[7] & 0x00ff) << 56) + ((buff[6] & 0x00ff) << 48)
+				+ ((buff[5] & 0x00ff) << 40) + ((buff[4] & 0x00ff) << 32)
+				+ ((buff[3] & 0x00ff) << 24) + ((buff[2] & 0x00ff) << 16)
+				+ ((buff[1] & 0x00ff) << 8) + ((buff[0] & 0x00ff));
 	}
 
 	public byte[] readByte(int num) {
