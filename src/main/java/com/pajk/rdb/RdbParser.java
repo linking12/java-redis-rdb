@@ -186,12 +186,17 @@ public class RdbParser {
 				IntSet intset = new IntSet(strByte);
 				value = intset.docodeIntsetValue();
 			} else if (type == REDIS_ZSET_ZIPLIST) {
-				TreeMap<Object, Object> zsetValue = new TreeMap<Object, Object>();
+				HashMap<Object, Object> zsetValue = new HashMap<Object, Object>();
 				ZipList zipList = new ZipList(strByte);
 				int entryCountList = zipList.decodeEntryCount();
 				for (int j = 0; j < entryCountList / 2; j++) {
 					Object val = zipList.decodeEntryValue();
 					Object score = zipList.decodeEntryValue();
+					if (score instanceof java.lang.Double) {
+						score = (Double) score;
+					} else if (score instanceof java.lang.Integer) {
+						score = Float.valueOf(((Integer) score).toString());
+					}
 					zsetValue.put(val, score);
 				}
 				zipList.getEndByte();

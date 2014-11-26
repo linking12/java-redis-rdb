@@ -76,30 +76,30 @@ public class ZipList {
 			} catch (UnsupportedEncodingException e) {
 				e.printStackTrace();
 			}
-		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N2BYTEVLAUE) {
+		} else if ((entry_headerbuff[0] & 0xff) >> 4 == ZIPLIST_ENTRY_FLAG_N2BYTEVLAUE) {
 			length = 2;
 			byte[] buff = readByte(length);// short
 			value = bytesToShort(buff);
-		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N4BYTEVLAUE) {
+		} else if ((entry_headerbuff[0] & 0xff) >> 4 == ZIPLIST_ENTRY_FLAG_N4BYTEVLAUE) {
 			length = 4;
 			byte[] buff = readByte(length);// int
 			value = bytesToInt(buff);
-		} else if ((entry_headerbuff[0] & 0x00f0) >> 4 == ZIPLIST_ENTRY_FLAG_N8BYTEVLAUE) {
+		} else if ((entry_headerbuff[0] & 0xff) >> 4 == ZIPLIST_ENTRY_FLAG_N8BYTEVLAUE) {
 			length = 8;
 			byte[] buff = readByte(length);// long
 			value = bytesToLong(buff);
-		} else if ((entry_headerbuff[0] & 0x00f0) == 240) {
+		} else if ((entry_headerbuff[0] & 0xff) == 240) {
 			byte[] buff = readByte(3);
 			byte[] newbuff = new byte[4];
 			newbuff[0] = 0;
 			System.arraycopy(buff, 0, newbuff, 1, buff.length);
 			value = bytesToInt(newbuff) >> 8;
-		} else if ((entry_headerbuff[0] & 0x00f0) == 254) {
+		} else if ((entry_headerbuff[0] & 0xff) == 254) {
 			byte[] buff = readByte(1);
 			value = (0x00ff & buff[0]);
-		} else if ((entry_headerbuff[0] & 0x00f0) >= 254
-				&& (entry_headerbuff[0] & 0x00f0) <= 253) {
-			value = (entry_headerbuff[0] & 0x00f0) - 241;
+		} else if ((entry_headerbuff[0] & 0xff) >= 241
+				&& (entry_headerbuff[0] & 0xff) <= 253) {
+			value = (entry_headerbuff[0] & 0xff) - 241;
 		}
 		return value;
 
