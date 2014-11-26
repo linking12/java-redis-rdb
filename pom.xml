@@ -13,7 +13,7 @@
 				<configuration>
 					<source>1.7</source>
 					<target>1.7</target>
-					<encoding>UTF8</encoding>
+					<encoding>gbk</encoding>
 				</configuration>
 			</plugin>
 		</plugins>
