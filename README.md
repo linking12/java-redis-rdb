@@ -2,7 +2,7 @@ java-redis-rdb
 parse redis dump.rdb file
 
 High Level Algorithm to parse RDB
-示例代码如下:
+
 
 public class RedisRdbParseTest {
 	public static void main(String[] args) {
